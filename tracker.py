@@ -2,13 +2,18 @@ import os
 import sys
 import time
 
+from utils import time_utils
+
 def trace_calls(frame, event, arg):
     if event == 'call':
-        # Get the function's module
+
+        #get the functions typed name
         module_name = frame.f_globals.get('__name__', '')
+
+        #gets the file location of the function
         module_file = frame.f_globals.get('__file__', '')
         
-        # Determine if this is a standard library module
+        #determine if this is a standard library module by checking where it is located and if it has tags
         is_stdlib = False
         if hasattr(sys, 'stdlib_module_names') and module_name in sys.stdlib_module_names:
             # Python 3.10+ has this attribute
@@ -31,6 +36,8 @@ def trace_calls(frame, event, arg):
                        (module_file and os.path.dirname(os.path.abspath(module_file)) == current_dir) or
                        (not is_stdlib and module_file))
         
+        #prints information if it is a written function
+        #TODO - change this to add to a dict or something to print better
         if is_your_code:
             print(f"Calling function: {frame.f_code.co_name}")
             print(f"Line number: {frame.f_lineno}")
@@ -41,76 +48,34 @@ def trace_calls(frame, event, arg):
     return trace_calls
 
 
-def time_to_dhmsm(run_time):
-    """
-    Converts the seconds run time to a printable run time string
-
-    Args:
-        run_time (int): The overall run time of the algorithm in seconds
-
-    Returns:
-        time_string (str): The printable string containing the formatted time
-    """
-
-    days = int(run_time // (60 * 60 * 24))
-    run_time = run_time % (60 * 60 * 24)
-    hours = int(run_time // (60 * 60))
-    run_time = run_time % (60 * 60)
-    minutes = int(run_time // (60))
-    run_time = run_time % (60)
-    seconds = run_time 
-
-    if days > 0:
-        print_string = f"{days:.0f}d, {hours}h, {minutes}m, {seconds:.3f}s"
-    elif hours > 0:
-        print_string = f"{hours}h, {minutes}m, {seconds:.3f}s"
-    elif minutes > 0:
-        print_string = f"{minutes}m, {seconds:.3f}s"
-    else:
-        print_string = f"{seconds:.3f}s"
-
-    return print_string
-
-
-def print_time(func, run_time):
-    """
-    Prints the run time of a function in an aesthetically nice way
-
-    Args:
-        func: a function object of the main function being tracked
-        run_time (int): The run time of the function 
-    """
-
-    #gets the function name and returns empty string if not found
-    func_name = func.f_globals.get('__name__', '')
-
-    time_string = time_to_dhmsm(run_time)
-
-    #TODO - format this dynamically by getting screen information
-    print_string = f"====== {func_name} took {time_string} to run ======"
-
-    print(print_string)
-
-
 def tracked(func):
 
     def wrapper(*args, **kwargs):
+
+        #start the tracing of the function
         sys.settrace(trace_calls)
-        start_time = time.time()
-        result = func(*args, **kwargs)
-        end_time = time.time()
+
+        #gets the initial time before the function starts
+        start_time = time.perf_counter()
+
+        #runs the function while tracking
+        #returns the function result as well as the stack trace of data flow
+        result, stack_trace = func(*args, **kwargs)
+
+        #gets the time once the function has concluded
+        end_time = time.perf_counter()
+
+        #calculates the overall run time
         run_time = start_time - end_time
-        print_time(func, run_time)
+
+        #stops the tracking so it doesn't track the print_time function
         sys.settrace(None)
+
+        #prints the time in a readable way
+        time_utils.print_time(func, run_time)
+
+        #return the result of the function
         return result
+
+    #runs and returns the value from the wrapper funcion for the function
     return wrapper
-
-
-times = [1234.4, 2300, 3434.242]
-
-for time in times:
-    print(f"Testing time {time}s")
-    converted_time = time_to_dhmsm(time)
-    print(f"Converted to {converted_time}")
-    print()
-
